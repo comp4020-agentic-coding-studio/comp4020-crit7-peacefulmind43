@@ -2,36 +2,38 @@
 
 ## What I built
 
-Due: every ANU deadline across my courses on one board, banded by urgency and
-labelled with grade weight, in SQLite on the Fly volume. `README.md` says what
-good means here and what I cut.
+I built Due. It is one board for all my ANU deadlines from every course. It
+sorts them by how urgent they are and shows how much of the grade each one is
+worth. The data is saved in SQLite on the Fly volume. `README.md` explains what
+"good" means for this app and what I did not build.
 
 ## How I got here
 
-The system that ruins my week is the gap between Wattle sites, so I took
-deadlines as the slice and chose urgency-plus-weight over a plain checklist. I
-kept the default stack so the effort went on the data model.
+For me, the problem is not one ANU system. The problem is that every course has
+its own Wattle page, so I have to remember all the deadlines myself. So I chose
+deadlines. I wanted urgency and weight on the board, not only a simple
+checklist. I used the default stack, so I could spend my time on the data model.
 
-I deployed the untouched starter first. The first token I found on Ed was for
-my final-project app, so before storing anything I had the agent run
-`flyctl status` with each token against both app names, and only the one that
-could see `comp4020-crit7` went into the repo.
+First I deployed the starter with no changes. The first token I found on Ed was
+for my final project app, not crit 7. Before saving it, I asked the agent to
+test each token against both app names with `flyctl status`. Only the token
+that worked for `comp4020-crit7` went into the repo.
 
-The spec's persistence line became tests before any feature code, committed
-red in
+Next I wrote tests for the spec before writing any feature code. They were red
+in
 [`bbd379c`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-peacefulmind43/commit/bbd379c).
-The key one restarts the server on the same database, because a reload alone
-can't tell SQLite from an in-memory array.
+The most important test restarts the server with the same database. A page
+reload alone cannot show the data is really in SQLite.
 
 [`bc0fe1f`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-peacefulmind43/commit/bc0fe1f)
-turned them green with `courses` and `deadlines` tables, with the course-code
-and weight rules held as schema `CHECK`s as well as in the handler. Two
-corrections came up. drizzle-kit's rename prompt can't run non-interactively,
-so the migration was split into add-then-drop rather than guessed. Headless
-Chrome won't lay out below 500px, so the phone check moved into a 375px iframe.
-Both became rules in `CLAUDE.md` in
+made the tests green. It has two tables, `courses` and `deadlines`. The course
+code and weight rules are checked in the handler and also in the schema. I had
+two problems. drizzle-kit asked a rename question that cannot run here, so I
+split the migration into two steps. Headless Chrome does not go smaller than
+500px, so I checked the phone size inside a 375px iframe. I added both as rules
+in `CLAUDE.md` in
 [`08ad3e4`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-peacefulmind43/commit/08ad3e4).
 
-To confirm it was right, `pnpm check` is green. On the live app I re-ran CI's
-post-deploy probes, then added a deadline, restarted the Fly machine and saw it
-survive.
+To check it works, `pnpm check` is green. On the live app I ran the same checks
+CI runs. Then I added a deadline, restarted the Fly machine, and the deadline
+was still there.

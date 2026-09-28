@@ -28,9 +28,12 @@ export default async function setup(project: TestProject): Promise<() => void> {
     });
   });
 
+  // vitest's pnpm launcher sets NODE_PATH to pnpm's hidden store, which lets
+  // the server resolve packages production doesn't ship (sharp, for one).
+  const { NODE_PATH: _, ...env } = process.env;
   const server = spawn("node", [entry], {
     env: {
-      ...process.env,
+      ...env,
       HOST: "127.0.0.1",
       PORT: String(port),
       DATABASE_PATH: join(mkdtempSync(join(tmpdir(), "spec-db-")), "test.db"),

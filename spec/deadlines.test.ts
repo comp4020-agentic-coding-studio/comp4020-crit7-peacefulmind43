@@ -163,8 +163,9 @@ async function bootServer(dbPath: string): Promise<{ url: string; stop: () => Pr
       probe.close(() => resolve(port));
     });
   });
+  const { NODE_PATH: _, ...env } = process.env;
   const child = spawn("node", ["./dist/server/entry.mjs"], {
-    env: { ...process.env, HOST: "127.0.0.1", PORT: String(port), DATABASE_PATH: dbPath },
+    env: { ...env, HOST: "127.0.0.1", PORT: String(port), DATABASE_PATH: dbPath },
     stdio: "ignore",
   });
   const url = `http://127.0.0.1:${port}`;

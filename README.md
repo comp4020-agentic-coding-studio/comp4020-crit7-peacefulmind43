@@ -9,7 +9,7 @@ riding on it written next to it. You add a deadline once (course code, what's
 due, when, weight) and it stays on the board, in SQLite on the app's volume,
 until you tick it off or delete it.
 
-![The board with deadlines from four courses, grouped by urgency](public/board.png)
+<img src="public/board.png" alt="The board with deadlines from four courses, grouped by urgency" width="1200" height="1500">
 
 ## What good looks like here
 

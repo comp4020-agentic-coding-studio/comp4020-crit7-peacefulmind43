@@ -40,5 +40,8 @@ here before changing behaviour; the rules below are the ones that protect it.
 - Changing layout means checking it in a real browser at desktop width and at
   375px. Headless Chrome won't lay out narrower than 500px at `--window-size`,
   so test phone width inside a 375px iframe.
+- README images are raw `<img src="public/...">` tags, not markdown images:
+  Astro sends markdown images through `/_image`, which needs `sharp`, and the
+  production image doesn't have it. `spec/assets.test.ts` holds this.
 - Leave `fly.toml`, the `Dockerfile` and the CI workflow as the starter
   shipped them.

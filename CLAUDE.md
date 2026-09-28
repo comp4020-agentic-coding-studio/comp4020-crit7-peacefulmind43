@@ -1,11 +1,44 @@
-# Your harness
+# Harness: Due (crit 7)
 
-This file is yours, and it arrives empty on purpose. The rules you hold the
-agent to are part of what gets marked, so they should be rules you decided on.
+Due is a cross-course ANU deadline board. Read `README.md` for what good means
+here before changing behaviour; the rules below are the ones that protect it.
 
-Nothing about the starter is recorded here. What the repo ships is explained
-where it lives --- `fly.toml`, the `Dockerfile`, the CI workflow and
-`spec/README.md` each say what they fix --- and the
-[course website](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/)
-publishes this deliverable's brief and spec. Read them before you plan or build;
-what the agent needs to carry from any of it is your call.
+## Data
+
+- `src/lib/schema.ts` is the ground truth. Change it, run `pnpm db:generate`,
+  and commit the migration with it. Never edit a migration that has shipped,
+  and never touch the database by hand: the deployed volume outlives every
+  deploy.
+- `drizzle-kit generate` cannot answer its rename prompt non-interactively. If
+  a change both drops and adds a table or column, split it into two migrations
+  (add first, then drop) rather than guessing an answer to the prompt.
+- Rules about valid data live in both places: the handler (for a readable
+  error) and a schema `CHECK` or constraint (so a bypassed handler still can't
+  store a bad row). Course codes are `[A-Z]{4}[0-9]{4}`; weight is an integer
+  0–100 or null.
+- Due times are Canberra wall time stored as `YYYY-MM-DDTHH:MM`. Compare them
+  only through `src/lib/time.ts`. Never use `new Date()` on a stored `dueAt`
+  directly or format it in the server's local zone.
+
+## Behaviour
+
+- Every write is a plain HTML form POST that answers `303` back to the board.
+  No write may depend on client-side JavaScript.
+- Keep `/api/events` sending its opening comment immediately: CI's
+  post-deploy probe reads it. Emit `change` on the bus after every successful
+  write.
+- Keep the page's content in English and the urgency labels written out, not
+  colour alone.
+
+## Checks
+
+- `pnpm check` must be green before every commit. Contract tests live in
+  `spec/deadlines.test.ts`; assert what the page does over HTTP, not how it's
+  built.
+- Any new page or query-string state gets added to `spec/routes.ts`, or the
+  invariants stop covering it.
+- Changing layout means checking it in a real browser at desktop width and at
+  375px. Headless Chrome won't lay out narrower than 500px at `--window-size`,
+  so test phone width inside a 375px iframe.
+- Leave `fly.toml`, the `Dockerfile` and the CI workflow as the starter
+  shipped them.

@@ -1,53 +1,187 @@
 ---
-import { listMessages } from "../lib/db";
-import "../styles.css";
+import Layout from "../layouts/Layout.astro";
+import { type BoardItem, COURSE_CODE, listCourses, listDeadlines } from "../lib/db";
+import { URGENCY_LABEL, type Urgency, canberraNow, formatDue, timeLeft, urgency } from "../lib/time";
 
-const messages = listMessages();
+const params = Astro.url.searchParams;
+const filterParam = (params.get("filter") ?? "").toUpperCase();
+const filter = COURSE_CODE.test(filterParam) ? filterParam : undefined;
+const error = params.get("error");
+const draft = {
+  course: error ? (params.get("course") ?? "") : "",
+  title: error ? (params.get("title") ?? "") : "",
+  due: error ? (params.get("due") ?? "") : "",
+  weight: error ? (params.get("weight") ?? "") : "",
+};
+
+const now = canberraNow();
+const items = listDeadlines(filter);
+const courseCodes = listCourses();
+const open = items.filter((d) => !d.done);
+const done = items.filter((d) => d.done).reverse();
+
+const order: Urgency[] = ["overdue", "day", "soon", "week", "later"];
+const groups = order
+  .map((band) => ({ band, items: open.filter((d) => urgency(d.dueAt, now) === band) }))
+  .filter((g) => g.items.length > 0);
+
+const pressing = open.filter((d) => ["overdue", "day", "soon"].includes(urgency(d.dueAt, now)));
+const weightAt = (list: BoardItem[]) => list.reduce((sum, d) => sum + (d.weight ?? 0), 0);
 ---
 
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>COMP4020 prototype</title>
-  </head>
-  <body>
-    <nav aria-label="site">
-      <a href="/">Guestbook</a>
-      <a href="/readme/">About</a>
-    </nav>
-    <main>
-      <h1>Guestbook</h1>
-      <p>
-        A minimal full-stack starter: messages live in SQLite on the machine's
-        volume (state survives a reload and a redeploy), and new messages
-        appear in every open tab over a server-sent-events stream — open this
-        page twice and sign it in one. Replace all of this with your own
-        prototype.
+<Layout title={filter ? `${filter} deadlines · Due` : "Due · every ANU deadline on one board"} current="board">
+  <main data-board>
+    <section class="intro" aria-labelledby="board-title">
+      <h1 id="board-title">{filter ? `${filter} deadlines` : "Every deadline, one board"}</h1>
+      <p class="lede">
+        Wattle keeps each course's deadlines inside that course. Due puts them in one list, soonest first,
+        coloured by how close they are and labelled with what they're worth.
       </p>
-      <form method="post" action="/api/messages">
-        <label for="body">Leave a message</label>
-        <input id="body" name="body" required maxlength="500" />
-        <button>Sign</button>
+      <dl class="summary">
+        <div><dt>Open</dt><dd>{open.length}</dd></div>
+        <div><dt>Due in the next 3 days</dt><dd>{pressing.length}</dd></div>
+        <div><dt>Grade riding on those</dt><dd>{weightAt(pressing)}%</dd></div>
+      </dl>
+    </section>
+
+    {
+      courseCodes.length > 0 && (
+        <nav class="filters" aria-label="Filter by course">
+          <a href="/" aria-current={filter ? undefined : "page"}>All courses</a>
+          {courseCodes.map((code) => (
+            <a href={`/?filter=${code}`} aria-current={filter === code ? "page" : undefined}>
+              {code}
+            </a>
+          ))}
+        </nav>
+      )
+    }
+
+    <p id="live" class="live" role="status" aria-live="polite" hidden>
+      This board changed in another tab. <a href="">Refresh to see it</a>
+    </p>
+
+    {
+      open.length === 0 && (
+        <p class="empty">
+          {filter ? `Nothing open for ${filter}.` : "Nothing due. Add your first deadline below."}
+        </p>
+      )
+    }
+
+    {
+      groups.map((group) => (
+        <section class={`band band-${group.band}`} aria-labelledby={`band-${group.band}`}>
+          <h2 id={`band-${group.band}`}>
+            {URGENCY_LABEL[group.band]} <span class="count">{group.items.length}</span>
+          </h2>
+          <ol class="deadlines">
+            {group.items.map((d) => (
+              <li id={`deadline-${d.id}`} data-deadline={d.id} data-state="open" class="deadline">
+                <div class="what">
+                  <span class="course">{d.course}</span>
+                  <span class="title">{d.title}</span>
+                </div>
+                <div class="when">
+                  <span class="tag">{URGENCY_LABEL[group.band]}</span>
+                  <time datetime={d.dueAt}>{formatDue(d.dueAt)}</time>
+                  <span class="left">{timeLeft(d.dueAt, now)}</span>
+                  {d.weight !== null && <span class="weight">{d.weight}%</span>}
+                </div>
+                <div class="actions">
+                  <form method="post" action={`/api/deadlines/${d.id}/toggle`}>
+                    <button aria-label={`Mark ${d.title} done`}>Done</button>
+                  </form>
+                  <form method="post" action={`/api/deadlines/${d.id}/delete`}>
+                    <button class="quiet" aria-label={`Delete ${d.title}`}>Delete</button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))
+    }
+
+    <section id="add" class="add" aria-labelledby="add-title">
+      <h2 id="add-title">Add a deadline</h2>
+      {error && <p class="error" role="alert">{error}</p>}
+      <form method="post" action="/api/deadlines" id="add-form">
+        <div class="field">
+          <label for="course">Course code</label>
+          <input
+            id="course"
+            name="course"
+            required
+            placeholder="COMP4020"
+            autocomplete="off"
+            list="course-codes"
+            value={draft.course || filter || ""}
+            pattern="[A-Za-z]{4}\s*[0-9]{4}"
+          />
+          <datalist id="course-codes">{courseCodes.map((code) => <option value={code} />)}</datalist>
+        </div>
+        <div class="field wide">
+          <label for="title">What's due</label>
+          <input id="title" name="title" required maxlength="200" placeholder="Crit 7 prototype" value={draft.title} />
+        </div>
+        <div class="field">
+          <label for="due">Due (Canberra time)</label>
+          <input id="due" name="due" type="datetime-local" required value={draft.due} />
+        </div>
+        <div class="field narrow">
+          <label for="weight">Weight %</label>
+          <input id="weight" name="weight" type="number" min="0" max="100" step="1" inputmode="numeric" value={draft.weight} />
+        </div>
+        <button class="primary">Add</button>
       </form>
-      <ul id="messages">
-        {messages.map((message) => <li>{message.body}</li>)}
-      </ul>
-    </main>
-    <script>
-      // The live half of the demo: subscribe to the SSE stream and prepend
-      // messages as they arrive. The form itself needs none of this — its
-      // POST + redirect re-renders the submitting tab from SQLite; this
-      // stream is how every other tab finds out.
-      const list = document.querySelector("#messages");
-      const source = new EventSource("/api/events");
-      source.addEventListener("message", (event) => {
-        const message = JSON.parse(event.data);
-        const item = document.createElement("li");
-        item.textContent = message.body;
-        list?.prepend(item);
-      });
-    </script>
-  </body>
-</html>
+    </section>
+
+    {
+      done.length > 0 && (
+        <details class="done">
+          <summary>
+            <h2>Done <span class="count">{done.length}</span></h2>
+          </summary>
+          <ol class="deadlines">
+            {done.map((d) => (
+              <li id={`deadline-${d.id}`} data-deadline={d.id} data-state="done" class="deadline is-done">
+                <div class="what">
+                  <span class="course">{d.course}</span>
+                  <span class="title">{d.title}</span>
+                </div>
+                <div class="when">
+                  <time datetime={d.dueAt}>{formatDue(d.dueAt)}</time>
+                  {d.weight !== null && <span class="weight">{d.weight}%</span>}
+                </div>
+                <div class="actions">
+                  <form method="post" action={`/api/deadlines/${d.id}/toggle`}>
+                    <button class="quiet" aria-label={`Reopen ${d.title}`}>Reopen</button>
+                  </form>
+                  <form method="post" action={`/api/deadlines/${d.id}/delete`}>
+                    <button class="quiet" aria-label={`Delete ${d.title}`}>Delete</button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )
+    }
+  </main>
+  <script>
+    // Another tab changed the board: reload straight away unless this tab has
+    // a half-typed deadline, in which case offer the refresh instead.
+    const form = document.querySelector<HTMLFormElement>("#add-form");
+    const live = document.querySelector<HTMLElement>("#live");
+    const typing = () =>
+      !!form && [...form.querySelectorAll("input")].some((input) => input.value !== input.defaultValue);
+    new EventSource("/api/events").addEventListener("change", () => {
+      if (typing()) {
+        if (live) live.hidden = false;
+      } else {
+        location.reload();
+      }
+    });
+  </script>
+</Layout>

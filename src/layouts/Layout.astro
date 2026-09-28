@@ -1,0 +1,29 @@
+---
+import "../styles.css";
+
+interface Props {
+  title: string;
+  current: "board" | "about";
+}
+const { title, current } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="One board for every ANU deadline, sorted by how soon it bites." />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">Due<span aria-hidden="true">.</span></a>
+      <nav aria-label="site">
+        <a href="/" aria-current={current === "board" ? "page" : undefined}>Board</a>
+        <a href="/readme/" aria-current={current === "about" ? "page" : undefined}>About</a>
+      </nav>
+    </header>
+    <slot />
+  </body>
+</html>
